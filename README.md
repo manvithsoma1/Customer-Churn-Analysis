@@ -30,6 +30,20 @@ The project demonstrates:
    ```
 3. Run the Jupyter Notebook to explore the models and see the resulting performance.
 
+### 🚀 Deployment
+
+#### Option 1: Streamlit Community Cloud (Recommended)
+This is the most seamless way to host the dashboard:
+1. Push all changes to GitHub.
+2. Go to [Streamlit Cloud](https://share.streamlit.io/) and connect your GitHub account.
+3. Select this repository and `app.py` as the main file.
+4. Click **Deploy**.
+
+#### Option 2: Vercel
+1. Ensure `vercel.json` is in the root directory.
+2. Run `vercel` in your terminal using the Vercel CLI.
+3. Note: Due to serverless limits, Streamlit might be unstable on Vercel. Community Cloud is highly recommended for production.
+
 ## Results
 - **Best Model:** Random Forest
 - **Accuracy:** 83.42%
