@@ -1,11 +1,12 @@
+streamlit==1.32.0
+altair==4.2.2
 pandas
 numpy
 scikit-learn
 matplotlib
 seaborn
 plotly
-streamlit==1.32.0
-altair==4.2.2
 shap
 joblib
 imbalanced-learn
+pillow==10.2.0
