@@ -1,0 +1,60 @@
+name: Churn Pipeline CI/CD
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Pull Data and Models from DVC
+        run: |
+          dvc pull
+
+      - name: Build Docker image
+        run: |
+          docker build -t churn-app:${{ github.sha }} .
+
+      - name: Push to Docker Hub
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        run: |
+          echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+          docker tag churn-app:${{ github.sha }} ${{ secrets.DOCKER_USERNAME }}/churn-app:latest
+          docker push ${{ secrets.DOCKER_USERNAME }}/churn-app:latest
+
+      - name: Set up kubectl
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
+          
+      - name: Deploy to Kubernetes
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        run: |
+          echo "${{ secrets.KUBECONFIG }}" > kubeconfig.yaml
+          export KUBECONFIG=$(pwd)/kubeconfig.yaml
+          kubectl apply -f k8s/deployment.yaml
+          kubectl apply -f k8s/service.yaml
+          kubectl rollout restart deployment churn-dashboard

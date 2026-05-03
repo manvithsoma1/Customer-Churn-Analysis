@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: churn-dashboard
+  labels:
+    app: churn-dashboard
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: churn-dashboard
+  template:
+    metadata:
+      labels:
+        app: churn-dashboard
+    spec:
+      containers:
+      - name: churn-app
+        # Replace with your Docker Hub username later
+        image: yourdockerhubusername/churn-app:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8501
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /_stcore/health
+            port: 8501
+          initialDelaySeconds: 15
+          periodSeconds: 20
