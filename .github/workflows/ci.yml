@@ -18,12 +18,11 @@ jobs:
         with:
           python-version: '3.9'
 
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
+      - name: Configure DagsHub Authentication
+        run: |
+          dvc remote modify origin --local auth basic
+          dvc remote modify origin --local user ${{ github.repository_owner }}
+          dvc remote modify origin --local password ${{ secrets.DAGSHUB_TOKEN }}
 
       - name: Install dependencies
         run: |
