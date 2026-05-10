@@ -3,14 +3,9 @@ __pycache__/
 .ipynb_checkpoints/
 create_notebook.py
 
-# DVC-tracked model artifacts (managed by DVC, not Git)
-/model.pkl
-/scaler.pkl
-/kmeans.pkl
-/feature_cols.json
-
-# DVC-tracked dataset
-/WA_Fn-UseC_-Telco-Customer-Churn.csv
+# NOTE: model.pkl, scaler.pkl, kmeans.pkl, feature_cols.json,
+# and the dataset CSV are now tracked in Git so Streamlit Cloud
+# can access them at deployment.
 
 # DVC local secrets (contains auth tokens — NEVER commit)
 .dvc/config.local
