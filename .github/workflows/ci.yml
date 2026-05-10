@@ -47,6 +47,9 @@ jobs:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
 
+    env:
+      HAS_KUBECONFIG: ${{ secrets.KUBECONFIG != '' }}
+
     steps:
       - uses: actions/checkout@v4
 
@@ -92,13 +95,13 @@ jobs:
           docker push ${{ secrets.DOCKER_USERNAME }}/churn-app:${{ github.sha }}
 
       - name: Set up kubectl
-        if: secrets.KUBECONFIG != ''
+        if: env.HAS_KUBECONFIG == 'true'
         uses: azure/setup-kubectl@v3
         with:
           version: 'latest'
 
       - name: Deploy to Kubernetes
-        if: secrets.KUBECONFIG != ''
+        if: env.HAS_KUBECONFIG == 'true'
         continue-on-error: true
         run: |
           echo "${{ secrets.KUBECONFIG }}" > kubeconfig.yaml
@@ -109,5 +112,5 @@ jobs:
           rm -f kubeconfig.yaml
 
       - name: Skip K8s deploy (no KUBECONFIG)
-        if: secrets.KUBECONFIG == ''
-        run: echo "⏭️ Skipping K8s deploy — KUBECONFIG secret not configured. Deploy locally with 'kubectl apply -f k8s/'"
+        if: env.HAS_KUBECONFIG != 'true'
+        run: echo "⏭️ Skipping K8s deploy — KUBECONFIG secret not configured. Deploy locally with Kind."
