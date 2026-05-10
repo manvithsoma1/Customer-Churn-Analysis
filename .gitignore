@@ -2,7 +2,26 @@ __pycache__/
 *.pyc
 .ipynb_checkpoints/
 create_notebook.py
+
+# DVC-tracked model artifacts (managed by DVC, not Git)
 /model.pkl
 /scaler.pkl
 /kmeans.pkl
 /feature_cols.json
+
+# DVC-tracked dataset
+/WA_Fn-UseC_-Telco-Customer-Churn.csv
+
+# DVC local secrets (contains auth tokens — NEVER commit)
+.dvc/config.local
+.dvc/tmp/
+.dvc/cache/
+
+# MLflow tracking (local only)
+mlflow.db
+mlruns/
+
+# OS / IDE
+.DS_Store
+.vscode/
+*.swp

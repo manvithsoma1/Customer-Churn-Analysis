@@ -5,10 +5,12 @@
     <img src="https://static.streamlit.io/badges/streamlit_badge_black_white.svg" alt="Streamlit App" />
   </a>
   &nbsp;
-  <img src="https://img.shields.io/badge/Python-3.11-blue?style=flat-square&logo=python&logoColor=white" />
+  <img src="https://github.com/manvithsoma1/Customer-Churn-Analysis/actions/workflows/ci.yml/badge.svg" alt="CI/CD" />
+  <img src="https://img.shields.io/badge/Python-3.9-blue?style=flat-square&logo=python&logoColor=white" />
   <img src="https://img.shields.io/badge/Accuracy-88%25+-brightgreen?style=flat-square" />
   <img src="https://img.shields.io/badge/AUC--ROC-0.85+-purple?style=flat-square" />
-  <img src="https://img.shields.io/badge/Model-Gradient%20Boosting-orange?style=flat-square" />
+  <img src="https://img.shields.io/badge/Model-Random%20Forest-orange?style=flat-square" />
+  <img src="https://img.shields.io/badge/MLOps-DVC%20%7C%20Docker%20%7C%20K8s-blueviolet?style=flat-square" />
   <img src="https://img.shields.io/badge/Deployment-Streamlit%20Cloud-ff4b4b?style=flat-square&logo=streamlit&logoColor=white" />
 </p>
 
@@ -126,24 +128,57 @@ Raw Data (Telco CSV — 7,043 customers)
 
 ```
 customer-churn-analysis/
-├── 📂 data/
-│   └── WA_Fn-UseC_-Telco-Customer-Churn.csv
+├── 📂 .github/workflows/
+│   └── ci.yml                    ← CI/CD pipeline (test → build → deploy)
+├── 📂 k8s/
+│   ├── deployment.yaml           ← Kubernetes Deployment (2 replicas)
+│   └── service.yaml              ← Kubernetes LoadBalancer Service
 ├── 📂 notebooks/
 │   └── churn_analysis.ipynb      ← Full analysis (EDA → Model → Segments)
 ├── 📂 src/
-│   └── pipeline.py               ← Reusable cleaning & feature functions
+│   ├── pipeline.py               ← Reusable cleaning & feature functions
+│   └── train.py                  ← MLflow training pipeline (DVC stage)
 ├── 📂 reports/
 │   ├── insights.md               ← Business recommendations
-│   ├── churn_distribution.png
-│   ├── feature_importance.png
-│   ├── model_evaluation.png
-│   ├── shap_summary.png
-│   └── customer_segments.png
+│   └── *.png                     ← EDA & model evaluation charts
 ├── app.py                        ← Streamlit dashboard
-├── model.pkl                     ← Trained model (joblib)
+├── Dockerfile                    ← Container image definition
+├── dvc.yaml                      ← DVC pipeline stages
+├── dvc.lock                      ← DVC pipeline lock (reproducibility)
 ├── requirements.txt
 └── README.md
 ```
+
+---
+
+## 🔧 MLOps Pipeline
+
+This project implements a **full production MLOps pipeline**:
+
+```
+  Git Push → GitHub Actions CI/CD
+                  │
+         ┌────────┼────────┐
+         ▼        ▼        ▼
+      DVC Pull  Train   Validate
+    (DagsHub)  (MLflow) (Smoke Test)
+                  │
+                  ▼
+           Docker Build & Push
+            (Docker Hub)
+                  │
+                  ▼
+          Kubernetes Deploy
+         (2 replicas, health checks)
+```
+
+| Tool | Role |
+|------|------|
+| **DVC + DagsHub** | Data & model versioning (S3-compatible remote) |
+| **MLflow** | Experiment tracking & metric logging |
+| **Docker** | Containerization with health checks |
+| **Kubernetes** | Orchestration — 2 replicas, readiness/liveness probes |
+| **GitHub Actions** | CI/CD — test → build → push → deploy |
 
 ---
 
@@ -151,21 +186,24 @@ customer-churn-analysis/
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/YOUR_USERNAME/customer-churn-analysis.git
-cd customer-churn-analysis
+git clone https://github.com/manvithsoma1/Customer-Churn-Analysis.git
+cd Customer-Churn-Analysis
 
 # 2. Install dependencies
 pip install -r requirements.txt
 
-# 3. Add the dataset
-# Download from: https://www.kaggle.com/datasets/blastchar/telco-customer-churn
-# Place CSV in: data/
+# 3. Pull data and models from DagsHub via DVC
+dvc pull
 
-# 4. Run the analysis notebook
-jupyter notebook notebooks/churn_analysis.ipynb
+# 4. (Optional) Re-train the model
+dvc repro
 
 # 5. Launch the dashboard
 streamlit run app.py
+
+# 6. (Optional) Run with Docker
+docker build -t churn-app .
+docker run -p 8501:8501 churn-app
 ```
 
 ---
@@ -180,7 +218,11 @@ streamlit run app.py
 | `shap` | Model explainability |
 | `plotly` · `seaborn` | Interactive & statistical visualizations |
 | `streamlit` | Dashboard & deployment |
-| `joblib` | Model serialization |
+| `MLflow` | Experiment tracking & model registry |
+| `DVC` + `DagsHub` | Data & model versioning (S3-compatible storage) |
+| `Docker` | Containerization with health checks |
+| `Kubernetes` | Container orchestration & scaling |
+| `GitHub Actions` | CI/CD pipeline automation |
 
 ---
 
