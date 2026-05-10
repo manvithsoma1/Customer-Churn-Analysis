@@ -17,7 +17,7 @@ spec:
       containers:
       - name: churn-app
         image: manvithsoma1/churn-app:latest
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8501
         resources:
