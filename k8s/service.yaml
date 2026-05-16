@@ -3,10 +3,11 @@ kind: Service
 metadata:
   name: churn-service
 spec:
-  type: LoadBalancer
+  type: NodePort
   selector:
     app: churn-dashboard
   ports:
     - protocol: TCP
       port: 80
       targetPort: 8501
+      nodePort: 30851

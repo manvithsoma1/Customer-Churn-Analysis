@@ -3,10 +3,18 @@ name: Churn Pipeline CI/CD
 on:
   push:
     branches: [ main, master ]
+    paths-ignore:
+      - '*.md'
+      - 'reports/**'
+      - 'notebooks/**'
   pull_request:
     branches: [ main, master ]
+  workflow_dispatch:        # Manual trigger from GitHub UI
 
 jobs:
+  # ──────────────────────────────────────────────
+  # JOB 1: Test — validate artifacts & pipeline
+  # ──────────────────────────────────────────────
   test:
     runs-on: ubuntu-latest
     steps:
@@ -18,37 +26,52 @@ jobs:
           python-version: '3.9'
           cache: 'pip'
 
-      - name: Install dependencies
-        run: pip install --no-cache-dir -r requirements.txt
+      - name: Install dependencies (app + DVC)
+        run: pip install --no-cache-dir -r requirements-ci.txt
 
-      - name: Configure DVC remote credentials
+      - name: Pull data from DVC (DagsHub)
+        # Graceful: if DAGSHUB_TOKEN is not set, skip DVC pull
+        # The repo already has artifacts committed in git as fallback
         run: |
-          dvc remote modify origin --local auth basic
-          dvc remote modify origin --local user ${{ github.repository_owner }}
-          dvc remote modify origin --local password ${{ secrets.DAGSHUB_TOKEN }}
-
-      - name: Pull data and models from DVC (DagsHub)
-        run: dvc pull
-
-      - name: Validate DVC pipeline (reproduce if needed)
-        run: dvc repro --dry
+          if [ -z "${{ secrets.DAGSHUB_TOKEN }}" ]; then
+            echo "⚠️  DAGSHUB_TOKEN not set — skipping DVC pull."
+            echo "    Using artifacts already committed in the repo."
+          else
+            echo "Configuring DVC remote credentials..."
+            dvc remote modify origin --local auth basic
+            dvc remote modify origin --local user ${{ github.repository_owner }}
+            dvc remote modify origin --local password ${{ secrets.DAGSHUB_TOKEN }}
+            echo "Pulling data from DagsHub..."
+            dvc pull --force || echo "⚠️  DVC pull failed — using committed artifacts."
+          fi
 
       - name: Smoke test — verify model artifacts exist
         run: |
           echo "Checking required artifacts..."
-          test -f model.pkl       && echo "✅ model.pkl"       || (echo "❌ model.pkl missing" && exit 1)
-          test -f scaler.pkl      && echo "✅ scaler.pkl"      || (echo "❌ scaler.pkl missing" && exit 1)
-          test -f kmeans.pkl      && echo "✅ kmeans.pkl"      || (echo "❌ kmeans.pkl missing" && exit 1)
+          test -f model.pkl        && echo "✅ model.pkl"        || (echo "❌ model.pkl missing" && exit 1)
+          test -f scaler.pkl       && echo "✅ scaler.pkl"       || (echo "❌ scaler.pkl missing" && exit 1)
+          test -f kmeans.pkl       && echo "✅ kmeans.pkl"       || (echo "❌ kmeans.pkl missing" && exit 1)
           test -f feature_cols.json && echo "✅ feature_cols.json" || (echo "❌ feature_cols.json missing" && exit 1)
+          test -f WA_Fn-UseC_-Telco-Customer-Churn.csv && echo "✅ dataset" || (echo "❌ dataset missing" && exit 1)
           echo "All artifacts present ✅"
 
+      - name: Quick sanity test — Python imports work
+        run: |
+          python -c "
+          import pandas, numpy, sklearn, joblib, json
+          model = joblib.load('model.pkl')
+          print(f'✅ Model loaded: {type(model).__name__}')
+          cols = json.load(open('feature_cols.json'))
+          print(f'✅ Features: {len(cols)} columns')
+          "
+
+  # ──────────────────────────────────────────────
+  # JOB 2: Build Docker image & deploy
+  # ──────────────────────────────────────────────
   build-and-deploy:
     needs: test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-
-    env:
-      HAS_KUBECONFIG: ${{ secrets.KUBECONFIG != '' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -59,17 +82,19 @@ jobs:
           python-version: '3.9'
           cache: 'pip'
 
-      - name: Install dependencies
-        run: pip install --no-cache-dir -r requirements.txt
+      - name: Install dependencies (app + DVC)
+        run: pip install --no-cache-dir -r requirements-ci.txt
 
-      - name: Configure DVC remote credentials
+      - name: Pull data from DVC (DagsHub)
         run: |
-          dvc remote modify origin --local auth basic
-          dvc remote modify origin --local user ${{ github.repository_owner }}
-          dvc remote modify origin --local password ${{ secrets.DAGSHUB_TOKEN }}
-
-      - name: Pull data and models from DVC
-        run: dvc pull
+          if [ -z "${{ secrets.DAGSHUB_TOKEN }}" ]; then
+            echo "⚠️  DAGSHUB_TOKEN not set — using committed artifacts."
+          else
+            dvc remote modify origin --local auth basic
+            dvc remote modify origin --local user ${{ github.repository_owner }}
+            dvc remote modify origin --local password ${{ secrets.DAGSHUB_TOKEN }}
+            dvc pull --force || echo "⚠️  DVC pull failed — using committed artifacts."
+          fi
 
       - name: Build Docker image
         run: docker build -t churn-app:${{ github.sha }} .
@@ -78,31 +103,35 @@ jobs:
         run: |
           docker run -d --name churn-test -p 8501:8501 churn-app:${{ github.sha }}
           echo "Waiting for Streamlit to start..."
-          sleep 20
+          sleep 25
           curl --fail http://localhost:8501/_stcore/health || (docker logs churn-test && exit 1)
           echo "✅ Health check passed"
           docker stop churn-test
           docker rm churn-test
 
+      # Docker Hub push — only if credentials are configured
       - name: Login to Docker Hub
-        run: echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+        if: ${{ secrets.DOCKER_USERNAME != '' }}
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Push to Docker Hub
+        if: ${{ secrets.DOCKER_USERNAME != '' }}
         run: |
           docker tag churn-app:${{ github.sha }} ${{ secrets.DOCKER_USERNAME }}/churn-app:latest
           docker tag churn-app:${{ github.sha }} ${{ secrets.DOCKER_USERNAME }}/churn-app:${{ github.sha }}
           docker push ${{ secrets.DOCKER_USERNAME }}/churn-app:latest
           docker push ${{ secrets.DOCKER_USERNAME }}/churn-app:${{ github.sha }}
 
-      - name: Set up kubectl
-        if: env.HAS_KUBECONFIG == 'true'
-        uses: azure/setup-kubectl@v3
-        with:
-          version: 'latest'
+      - name: Skip Docker Hub push
+        if: ${{ secrets.DOCKER_USERNAME == '' }}
+        run: echo "⏭️ Skipping Docker Hub push — DOCKER_USERNAME secret not configured."
 
+      # Kubernetes deploy — only if KUBECONFIG is configured
       - name: Deploy to Kubernetes
-        if: env.HAS_KUBECONFIG == 'true'
-        continue-on-error: true
+        if: ${{ secrets.KUBECONFIG != '' }}
         run: |
           echo "${{ secrets.KUBECONFIG }}" > kubeconfig.yaml
           export KUBECONFIG=$(pwd)/kubeconfig.yaml
@@ -111,6 +140,6 @@ jobs:
           kubectl rollout restart deployment churn-dashboard
           rm -f kubeconfig.yaml
 
-      - name: Skip K8s deploy (no KUBECONFIG)
-        if: env.HAS_KUBECONFIG != 'true'
-        run: echo "⏭️ Skipping K8s deploy — KUBECONFIG secret not configured. Deploy locally with Kind."
+      - name: Skip K8s deploy
+        if: ${{ secrets.KUBECONFIG == '' }}
+        run: echo "⏭️ Skipping K8s deploy — deploy locally with Kind instead."

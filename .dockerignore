@@ -1,0 +1,38 @@
+# Version control
+.git
+.gitignore
+
+# DVC cache (large, not needed in container)
+.dvc/cache
+.dvc/tmp
+.dvc/config.local
+
+# MLflow local tracking (not needed in container)
+mlruns/
+mlflow.db
+
+# IDE / OS files
+.vscode/
+.devcontainer/
+.DS_Store
+*.swp
+
+# Notebooks and reports (not needed at runtime)
+notebooks/
+reports/
+
+# Build artifacts
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# CI/CD configs
+.github/
+k8s/
+
+# Misc
+create_notebook.py
+setup_dvc_dagshub.sh
+vercel.json
+README.md
+requirements-ci.txt

@@ -1,0 +1,5 @@
+# CI/CD dependencies — extends the base app requirements
+# Used by GitHub Actions to pull data from DagsHub via DVC
+-r requirements.txt
+dvc==3.67.1
+dvc-http

@@ -5,7 +5,7 @@ metadata:
   labels:
     app: churn-dashboard
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: churn-dashboard
@@ -16,26 +16,30 @@ spec:
     spec:
       containers:
       - name: churn-app
-        image: manvithsoma1/churn-app:latest
-        imagePullPolicy: IfNotPresent
+        image: churn-app:latest
+        imagePullPolicy: Never
         ports:
         - containerPort: 8501
         resources:
           requests:
-            memory: "512Mi"
-            cpu: "250m"
+            memory: "256Mi"
+            cpu: "100m"
           limits:
-            memory: "1Gi"
+            memory: "512Mi"
             cpu: "500m"
         readinessProbe:
           httpGet:
             path: /_stcore/health
             port: 8501
-          initialDelaySeconds: 10
+          initialDelaySeconds: 30
           periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
         livenessProbe:
           httpGet:
             path: /_stcore/health
             port: 8501
-          initialDelaySeconds: 30
+          initialDelaySeconds: 45
           periodSeconds: 20
+          timeoutSeconds: 5
+          failureThreshold: 3

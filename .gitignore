@@ -4,7 +4,7 @@ __pycache__/
 create_notebook.py
 
 # NOTE: model.pkl, scaler.pkl, kmeans.pkl, feature_cols.json,
-# and the dataset CSV are now tracked in Git so Streamlit Cloud
+# and the dataset CSV are tracked in Git so Streamlit Cloud
 # can access them at deployment.
 
 # DVC local secrets (contains auth tokens — NEVER commit)
@@ -20,3 +20,8 @@ mlruns/
 .DS_Store
 .vscode/
 *.swp
+Thumbs.db
+/model.pkl
+/scaler.pkl
+/kmeans.pkl
+/feature_cols.json
