@@ -64,9 +64,12 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-
+    env:
+      DOCKER_USER: ${{ secrets.DOCKER_USERNAME }}
+      KUBE_CONF: ${{ secrets.KUBECONFIG }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v3
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -80,36 +83,35 @@ jobs:
       - name: Pull data from DVC (DagsHub)
         run: |
           if [ -z "${{ secrets.DAGSHUB_TOKEN }}" ]; then
-            echo "DAGSHUB_TOKEN not set - using committed artifacts."
+            echo "DAGSHUB_TOKEN is empty. Skipping DVC pull in build phase."
           else
             dvc remote modify origin --local auth basic
             dvc remote modify origin --local user ${{ github.repository_owner }}
             dvc remote modify origin --local password ${{ secrets.DAGSHUB_TOKEN }}
-            dvc pull --force || echo "DVC pull failed - using committed artifacts."
+            dvc pull
           fi
 
-      - name: Build Docker image
-        run: docker build -t churn-app:${{ github.sha }} .
-
-      - name: Docker smoke test
+      - name: Build Docker Image
         run: |
-          docker run -d --name churn-test -p 8501:8501 churn-app:${{ github.sha }}
-          echo "Waiting for Streamlit to start..."
+          docker build -t churn-app:${{ github.sha }} .
+
+      - name: Test Docker Container
+        run: |
+          docker run -d -p 8501:8501 --name churn-test churn-app:${{ github.sha }}
           sleep 25
-          curl --fail http://localhost:8501/_stcore/health || (docker logs churn-test && exit 1)
-          echo "Health check passed"
+          curl -f http://localhost:8501/_stcore/health || exit 1
           docker stop churn-test
           docker rm churn-test
 
       - name: Login to Docker Hub
-        if: secrets.DOCKER_USERNAME != ''
+        if: env.DOCKER_USER != ''
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Push to Docker Hub
-        if: secrets.DOCKER_USERNAME != ''
+        if: env.DOCKER_USER != ''
         run: |
           docker tag churn-app:${{ github.sha }} ${{ secrets.DOCKER_USERNAME }}/churn-app:latest
           docker tag churn-app:${{ github.sha }} ${{ secrets.DOCKER_USERNAME }}/churn-app:${{ github.sha }}
@@ -117,11 +119,11 @@ jobs:
           docker push ${{ secrets.DOCKER_USERNAME }}/churn-app:${{ github.sha }}
 
       - name: Skip Docker Hub push
-        if: secrets.DOCKER_USERNAME == ''
+        if: env.DOCKER_USER == ''
         run: echo "Skipping Docker Hub push - DOCKER_USERNAME secret not configured."
 
       - name: Deploy to Kubernetes
-        if: secrets.KUBECONFIG != ''
+        if: env.KUBE_CONF != ''
         run: |
           echo "${{ secrets.KUBECONFIG }}" > kubeconfig.yaml
           export KUBECONFIG=$(pwd)/kubeconfig.yaml
@@ -131,5 +133,5 @@ jobs:
           rm -f kubeconfig.yaml
 
       - name: Skip K8s deploy
-        if: secrets.KUBECONFIG == ''
+        if: env.KUBE_CONF == ''
         run: echo "Skipping K8s deploy - deploy locally with Kind instead."
