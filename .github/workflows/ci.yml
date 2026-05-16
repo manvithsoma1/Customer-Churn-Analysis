@@ -102,14 +102,14 @@ jobs:
           docker rm churn-test
 
       - name: Login to Docker Hub
-        if: ${{ secrets.DOCKER_USERNAME != '' }}
+        if: secrets.DOCKER_USERNAME != ''
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Push to Docker Hub
-        if: ${{ secrets.DOCKER_USERNAME != '' }}
+        if: secrets.DOCKER_USERNAME != ''
         run: |
           docker tag churn-app:${{ github.sha }} ${{ secrets.DOCKER_USERNAME }}/churn-app:latest
           docker tag churn-app:${{ github.sha }} ${{ secrets.DOCKER_USERNAME }}/churn-app:${{ github.sha }}
@@ -117,11 +117,11 @@ jobs:
           docker push ${{ secrets.DOCKER_USERNAME }}/churn-app:${{ github.sha }}
 
       - name: Skip Docker Hub push
-        if: ${{ secrets.DOCKER_USERNAME == '' }}
+        if: secrets.DOCKER_USERNAME == ''
         run: echo "Skipping Docker Hub push - DOCKER_USERNAME secret not configured."
 
       - name: Deploy to Kubernetes
-        if: ${{ secrets.KUBECONFIG != '' }}
+        if: secrets.KUBECONFIG != ''
         run: |
           echo "${{ secrets.KUBECONFIG }}" > kubeconfig.yaml
           export KUBECONFIG=$(pwd)/kubeconfig.yaml
@@ -131,5 +131,5 @@ jobs:
           rm -f kubeconfig.yaml
 
       - name: Skip K8s deploy
-        if: ${{ secrets.KUBECONFIG == '' }}
+        if: secrets.KUBECONFIG == ''
         run: echo "Skipping K8s deploy - deploy locally with Kind instead."
