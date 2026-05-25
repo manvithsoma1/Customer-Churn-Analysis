@@ -398,17 +398,19 @@ elif page == "🤖 Churn Predictor":
             st.markdown("### 🔎 Top 3 Reasons Driving This Prediction")
             try:
                 import shap
-                explainer   = shap.Explainer(model.predict, pd.DataFrame(
-                    scaler.transform(pd.DataFrame([np.zeros(len(feature_cols))],
-                                     columns=feature_cols)),
-                    columns=feature_cols))
-                shap_vals   = explainer(pd.DataFrame(X_scaled, columns=feature_cols))
-                sv          = shap_vals.values[0]
-                top_idx     = np.argsort(np.abs(sv))[::-1][:3]
+                # Use TreeExplainer — native to RandomForest, no background data needed
+                explainer = shap.TreeExplainer(model)
+                shap_vals = explainer.shap_values(pd.DataFrame(X_scaled, columns=feature_cols))
+                # shap_values returns list [class0, class1] for classifiers
+                if isinstance(shap_vals, list):
+                    sv = shap_vals[1][0]   # class-1 (churn) SHAP values for row 0
+                else:
+                    sv = shap_vals[0]
+                top_idx = np.argsort(np.abs(sv))[::-1][:3]
                 for rank, idx in enumerate(top_idx, 1):
-                    fname  = feature_cols[idx]
-                    fval   = df_enc.iloc[0, idx]
-                    impact = sv[idx]
+                    fname     = feature_cols[idx]
+                    fval      = df_enc.iloc[0, idx]
+                    impact    = sv[idx]
                     direction = "↑ increases" if impact > 0 else "↓ decreases"
                     color     = RED if impact > 0 else GREEN
                     st.markdown(
@@ -419,8 +421,8 @@ elif page == "🤖 Churn Predictor":
             except Exception:
                 # Fallback: use feature importances
                 if hasattr(model, "feature_importances_"):
-                    imp    = model.feature_importances_
-                    top3   = np.argsort(imp)[::-1][:3]
+                    imp  = model.feature_importances_
+                    top3 = np.argsort(imp)[::-1][:3]
                     for rank, idx in enumerate(top3, 1):
                         st.markdown(f"**{rank}.** `{feature_cols[idx]}` — high importance feature")
                 else:

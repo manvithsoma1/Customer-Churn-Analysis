@@ -21,7 +21,4 @@ mlruns/
 .vscode/
 *.swp
 Thumbs.db
-/model.pkl
-/scaler.pkl
-/kmeans.pkl
-/feature_cols.json
+
